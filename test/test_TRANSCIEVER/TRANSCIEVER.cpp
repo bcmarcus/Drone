@@ -19,7 +19,6 @@
 // Include the RFM69 and SPI libraries:
 // #include "Arduino.h"
 #include "Wire.h"
-// #include "SPI.h"
 #include <Adafruit_Sensor.h>
 #include <Adafruit_I2CDevice.h>
 
@@ -34,7 +33,7 @@
 #define NETWORKID     0   // Must be the same for all nodes
 #define MYNODEID      1   // My node ID
 #define TONODEID      2   // Destination node ID
-#define MAX_MESSAGE_LEN 255
+#define MAX_MESSAGE_LEN 10
 
 // RFM69 frequency, uncomment the frequency of your module:
 
@@ -43,7 +42,7 @@
 
 // AES encryption (or not):
 
-#define ENCRYPT       true // Set to "true" to use encryption
+#define ENCRYPT       false // Set to "true" to use encryption
 #define ENCRYPTKEY    "TOPSECRETPASSWRD" // Use the same 16-byte key on all nodes
 
 // Use ACKnowledge when sending messages (or not):
@@ -81,7 +80,7 @@ void setup()
   } else {
     Serial.println ("init success");
   }
-  driver.setTxPower(20, true); // Always use this for RFM69HCW
+  driver.setTxPower(15, true); // Always use this for RFM69HCW
 
   // Turn on encryption if desired:
 
@@ -94,7 +93,7 @@ void loop()
 {
   // Set up a "buffer" for characters that we'll send:
 
-  static char sendbuffer[62];
+  static char sendbuffer[MAX_MESSAGE_LEN];
   static int sendlength = 0;
 
   // SENDING
@@ -118,7 +117,7 @@ void loop()
 
     // If the input is a carriage return, or the buffer is full:
 
-    if ((input == '\r') || (sendlength == 61)) // CR or buffer full
+    if ((input == '\r') || (sendlength == MAX_MESSAGE_LEN - 1)) // CR or buffer full
     {
       // Send the packet!
 
