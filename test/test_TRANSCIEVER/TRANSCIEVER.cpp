@@ -56,7 +56,7 @@
 #define GND           8 // LED ground pin
 // Create a library object for our RFM69HCW module:
 
-RH_RF69 driver(12, 10, hardware_spi);
+RH_RF69 driver(29, 31, hardware_spi1);
 
 void setup()
 {
@@ -78,8 +78,10 @@ void setup()
   // radio.setCS(10);  //uncomment this if using Pro Micro
   if (!driver.init()) {
     Serial.println ("init failed");
+  } else {
+    Serial.println ("init success");
   }
-  driver.setTxPower(15, true); // Always use this for RFM69HCW
+  driver.setTxPower(20, true); // Always use this for RFM69HCW
 
   // Turn on encryption if desired:
 
@@ -102,7 +104,7 @@ void loop()
   // or (2) the buffer is full (61 characters).
 
   // If there is any serial input, add it to the buffer:
-  Serial.println ("loop");
+  // Serial.println ("loop");
   if (Serial.available() > 0)
   {
     Serial.println ("here1");
