@@ -32,13 +32,13 @@
 // Addresses for this node. CHANGE THESE FOR EACH NODE!
 
 #define NETWORKID     0   // Must be the same for all nodes
-#define MYNODEID      1   // My node ID
-#define TONODEID      2   // Destination node ID
+#define MYNODEID      2   // My node ID
+#define TONODEID      1   // Destination node ID
 
 // RFM69 frequency, uncomment the frequency of your module:
 
-//#define FREQUENCY   RF69_433MHZ
-#define FREQUENCY     RF69_915MHZ
+#define FREQUENCY   RF69_433MHZ
+// #define FREQUENCY     RF69_915MHZ
 
 // AES encryption (or not):
 
@@ -47,16 +47,19 @@
 
 // Use ACKnowledge when sending messages (or not):
 
-#define USEACK        true // Request ACKs or not
+#define USEACK        false // Request ACKs or not
 
 // Packet sent/received indicator LED (optional):
 
 #define LED           9 // LED positive pin
 #define GND           8 // LED ground pin
 
+#define BUFFERLEN     10
+#define RFM69_RST_PIN 25
+
 // Create a library object for our RFM69HCW module:
 
-RFM69 radio(29, 31, hardware_spi1);
+RFM69 radio(24, 28, true, &SPI1);
 
 void setup()
 {
@@ -69,16 +72,18 @@ void setup()
 
   // Set up the indicator LED (optional):
 
-  pinMode(LED,OUTPUT);
-  digitalWrite(LED,LOW);
-  pinMode(GND,OUTPUT);
-  digitalWrite(GND,LOW);
+  pinMode(RFM69_RST_PIN, OUTPUT);
+  digitalWrite(RFM69_RST_PIN, HIGH);
+  delay(100);
+  digitalWrite(RFM69_RST_PIN, LOW);
+  delay(100);
 
   // Initialize the RFM69HCW:
   // radio.setCS(10);  //uncomment this if using Pro Micro
   radio.initialize(FREQUENCY, MYNODEID, NETWORKID);
   radio.setHighPower(); // Always use this for RFM69HCW
-
+  radio.spyMode();
+  radio.setPowerLevel(23);
   // Turn on encryption if desired:
 
   if (ENCRYPT)
@@ -89,7 +94,7 @@ void loop()
 {
   // Set up a "buffer" for characters that we'll send:
 
-  static char sendbuffer[62];
+  static char sendbuffer[BUFFERLEN];
   static int sendlength = 0;
 
   // SENDING
@@ -99,6 +104,55 @@ void loop()
   // or (2) the buffer is full (61 characters).
 
   // If there is any serial input, add it to the buffer:
+
+
+
+
+
+
+
+  // test //
+  // delay(100);
+  // sendlength = 5;
+  // sendbuffer[0] = 'h';
+  // sendbuffer[1] = 'e';
+  // sendbuffer[2] = 'l';
+  // sendbuffer[3] = 'l';
+  // sendbuffer[4] = 'o';
+  // Serial.print("sending to node ");
+  // Serial.print(TONODEID, DEC);
+  // Serial.print(", message [");
+  // for (byte i = 0; i < sendlength; i++)
+  //   Serial.print(sendbuffer[i]);
+  // Serial.println("]");
+
+  // // There are two ways to send packets. If you want
+  // // acknowledgements, use sendWithRetry():
+
+  // if (USEACK)
+  // {
+  //   if (radio.sendWithRetry(TONODEID, sendbuffer, sendlength))
+  //     Serial.println("ACK received!");
+  //   else
+  //     Serial.println("no ACK received");
+  // }
+
+  // // If you don't need acknowledgements, just use send():
+
+  // else // don't use ACK
+  // {
+  //   radio.send(TONODEID, sendbuffer, sendlength);
+  // }
+
+  // sendlength = 0; // reset the packet
+  // // test // 
+
+
+
+
+
+
+
 
   if (Serial.available() > 0)
   {
@@ -112,7 +166,7 @@ void loop()
 
     // If the input is a carriage return, or the buffer is full:
 
-    if ((input == '\r') || (sendlength == 61)) // CR or buffer full
+    if ((input == '\r') || (sendlength == BUFFERLEN - 1)) // CR or buffer full
     {
       // Send the packet!
 
@@ -143,7 +197,7 @@ void loop()
       }
 
       sendlength = 0; // reset the packet
-      Blink(LED,10);
+      // Blink(LED,10);
     }
   }
 
@@ -180,7 +234,7 @@ void loop()
       radio.sendACK();
       Serial.println("ACK sent");
     }
-    Blink(LED,10);
+    // Blink(LED,10);
   }
 }
 

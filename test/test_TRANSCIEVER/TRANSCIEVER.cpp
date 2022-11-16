@@ -17,23 +17,23 @@
 // SparkFun repository: https://github.com/sparkfun/RFM69HCW_Breakout
 
 // Include the RFM69 and SPI libraries:
-// #include "Arduino.h"
+
 #include "Wire.h"
 #include <Adafruit_Sensor.h>
 #include <Adafruit_I2CDevice.h>
-
 #include <Arduino.h>
-#include <RH_RF69.h>
 #include <SPI.h>
 #include <RHHardwareSPI.h>
 #include <RHHardwareSPI1.h>
 
+#include <RFM69.h>
+#include <SPI.h>
+
 // Addresses for this node. CHANGE THESE FOR EACH NODE!
 
 #define NETWORKID     0   // Must be the same for all nodes
-#define MYNODEID      1   // My node ID
-#define TONODEID      2   // Destination node ID
-#define MAX_MESSAGE_LEN 10
+#define MYNODEID      2   // My node ID
+#define TONODEID      1   // Destination node ID
 
 // RFM69 frequency, uncomment the frequency of your module:
 
@@ -42,7 +42,7 @@
 
 // AES encryption (or not):
 
-#define ENCRYPT       false // Set to "true" to use encryption
+#define ENCRYPT       true // Set to "true" to use encryption
 #define ENCRYPTKEY    "TOPSECRETPASSWRD" // Use the same 16-byte key on all nodes
 
 // Use ACKnowledge when sending messages (or not):
@@ -53,9 +53,13 @@
 
 #define LED           9 // LED positive pin
 #define GND           8 // LED ground pin
+
+#define BUFFERLEN     10
+#define RFM69_RST_PIN 25
+
 // Create a library object for our RFM69HCW module:
 
-RH_RF69 driver(29, 31, hardware_spi1);
+RFM69 radio(24, 28, true, &SPI1);
 
 void setup()
 {
@@ -68,32 +72,29 @@ void setup()
 
   // Set up the indicator LED (optional):
 
-  // pinMode(LED,OUTPUT);
-  // digitalWrite(LED,LOW);
-  // pinMode(GND,OUTPUT);
-  // digitalWrite(GND,LOW);
+  pinMode(RFM69_RST_PIN, OUTPUT);
+  digitalWrite(RFM69_RST_PIN, HIGH);
+  delay(100);
+  digitalWrite(RFM69_RST_PIN, LOW);
+  delay(100);
 
   // Initialize the RFM69HCW:
   // radio.setCS(10);  //uncomment this if using Pro Micro
-  if (!driver.init()) {
-    Serial.println ("init failed");
-  } else {
-    Serial.println ("init success");
-  }
-  driver.setTxPower(15, true); // Always use this for RFM69HCW
-
+  radio.initialize(FREQUENCY, MYNODEID, NETWORKID);
+  radio.setHighPower(); // Always use this for RFM69HCW
+  radio.spyMode();
+  radio.setPowerLevel(23);
   // Turn on encryption if desired:
 
   if (ENCRYPT)
-    driver.setEncryptionKey((uint8_t *) ENCRYPTKEY);
-
+    radio.encrypt(ENCRYPTKEY);
 }
 
 void loop()
 {
   // Set up a "buffer" for characters that we'll send:
 
-  static char sendbuffer[MAX_MESSAGE_LEN];
+  static char sendbuffer[BUFFERLEN];
   static int sendlength = 0;
 
   // SENDING
@@ -103,10 +104,58 @@ void loop()
   // or (2) the buffer is full (61 characters).
 
   // If there is any serial input, add it to the buffer:
-  // Serial.println ("loop");
+
+
+
+
+
+
+
+  // test //
+  // delay(100);
+  // sendlength = 5;
+  // sendbuffer[0] = 'h';
+  // sendbuffer[1] = 'e';
+  // sendbuffer[2] = 'l';
+  // sendbuffer[3] = 'l';
+  // sendbuffer[4] = 'o';
+  // Serial.print("sending to node ");
+  // Serial.print(TONODEID, DEC);
+  // Serial.print(", message [");
+  // for (byte i = 0; i < sendlength; i++)
+  //   Serial.print(sendbuffer[i]);
+  // Serial.println("]");
+
+  // // There are two ways to send packets. If you want
+  // // acknowledgements, use sendWithRetry():
+
+  // if (USEACK)
+  // {
+  //   if (radio.sendWithRetry(TONODEID, sendbuffer, sendlength))
+  //     Serial.println("ACK received!");
+  //   else
+  //     Serial.println("no ACK received");
+  // }
+
+  // // If you don't need acknowledgements, just use send():
+
+  // else // don't use ACK
+  // {
+  //   radio.send(TONODEID, sendbuffer, sendlength);
+  // }
+
+  // sendlength = 0; // reset the packet
+  // // test // 
+
+
+
+
+
+
+
+
   if (Serial.available() > 0)
   {
-    Serial.println ("here1");
     char input = Serial.read();
 
     if (input != '\r') // not a carriage return
@@ -117,7 +166,7 @@ void loop()
 
     // If the input is a carriage return, or the buffer is full:
 
-    if ((input == '\r') || (sendlength == MAX_MESSAGE_LEN - 1)) // CR or buffer full
+    if ((input == '\r') || (sendlength == BUFFERLEN - 1)) // CR or buffer full
     {
       // Send the packet!
 
@@ -132,20 +181,20 @@ void loop()
       // There are two ways to send packets. If you want
       // acknowledgements, use sendWithRetry():
 
-      // if (USEACK)
-      // {
-      //   if (driver.send((uint8_t *) sendbuffer, sendlength))
-      //     Serial.println("ACK received!");
-      //   else
-      //     Serial.println("no ACK received");
-      // }
+      if (USEACK)
+      {
+        if (radio.sendWithRetry(TONODEID, sendbuffer, sendlength))
+          Serial.println("ACK received!");
+        else
+          Serial.println("no ACK received");
+      }
 
       // If you don't need acknowledgements, just use send():
 
-      // else // don't use ACK
-      // {
-        driver.send((uint8_t *)sendbuffer, sendlength);
-      // }
+      else // don't use ACK
+      {
+        radio.send(TONODEID, sendbuffer, sendlength);
+      }
 
       sendlength = 0; // reset the packet
       // Blink(LED,10);
@@ -156,34 +205,35 @@ void loop()
 
   // In this section, we'll check with the RFM69HCW to see
   // if it has received any packets:
-  uint8_t buf[MAX_MESSAGE_LEN];
 
-  uint8_t len = MAX_MESSAGE_LEN;
-  // uint8_t from;
-  if (driver.recv(buf, &len)) // Got one!
+  if (radio.receiveDone()) // Got one!
   {
     // Print out the information:
 
     Serial.print("received from node ");
+    Serial.print(radio.SENDERID, DEC);
     Serial.print(", message [");
 
-    for (byte i = 0; i < len; i++)
-      Serial.print((char)buf[i]);
+    // The actual message is contained in the DATA array,
+    // and is DATALEN bytes in size:
+
+    for (byte i = 0; i < radio.DATALEN; i++)
+      Serial.print((char)radio.DATA[i]);
 
     // RSSI is the "Receive Signal Strength Indicator",
     // smaller numbers mean higher power.
 
     Serial.print("], RSSI ");
-    Serial.println(driver.rssiRead());
+    Serial.println(radio.RSSI);
 
     // Send an ACK if requested.
     // (You don't need this code if you're not using ACKs.)
 
-    // if (radio.ACKRequested())
-    // {
-    //   radio.sendACK();
-    //   Serial.println("ACK sent");
-    // }
+    if (radio.ACKRequested())
+    {
+      radio.sendACK();
+      Serial.println("ACK sent");
+    }
     // Blink(LED,10);
   }
 }

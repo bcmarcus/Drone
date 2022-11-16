@@ -303,6 +303,9 @@ int8_t RFM69::setPowerDBm(int8_t dBm) {
 
 bool RFM69::canSend() 
 {
+  Serial.print (_mode);
+  Serial.print (", ");
+  Serial.println (readRSSI());
   if (_mode == RF69_MODE_RX && PAYLOADLEN == 0 && readRSSI() < CSMA_LIMIT) // if signal stronger than -100dBm is detected assume channel activity
   {
     setMode(RF69_MODE_STANDBY);
