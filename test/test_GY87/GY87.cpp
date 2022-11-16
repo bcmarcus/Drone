@@ -13,9 +13,11 @@ TwoWire wire = Wire1;
 float ax, ay, az, gx, gy, gz, mx, my, mz, t, pres, alt;
 uint16_t calibrationCount = 100;
 
-void calibrateSensors() {
+void calibrateSensors()
+{
   sensors_event_t a, g, temp, event;
-  for (int i = 0; i < calibrationCount; i++) {
+  for (int i = 0; i < calibrationCount; i++)
+  {
     mpu.getEvent(&a, &g, &temp);
     mag.getEvent(&event);
     ax += a.acceleration.x;
@@ -34,7 +36,8 @@ void calibrateSensors() {
 
   ax /= calibrationCount;
   ay /= calibrationCount;
-  az /= calibrationCount; az -= 9.81;
+  az /= calibrationCount;
+  az -= 9.81;
   gx /= calibrationCount;
   gy /= calibrationCount;
   gz /= calibrationCount;
@@ -45,43 +48,72 @@ void calibrateSensors() {
   pres /= calibrationCount;
   alt /= calibrationCount;
 
-
-  Serial.println ("");
-  Serial.println ("Default Values");
-  Serial.print ("ax: "); Serial.print (ax); Serial.println (" m/s^2");
-  Serial.print ("ay: "); Serial.print (ay); Serial.println (" m/s^2");
-  Serial.print ("az: "); Serial.print (az); Serial.println (" m/s^2");
-  Serial.print ("gx: "); Serial.print (gx); Serial.println (" rad/s^2");
-  Serial.print ("gy: "); Serial.print (gy); Serial.println (" rad/s^2");
-  Serial.print ("gz: "); Serial.print (gz); Serial.println (" rad/s^2");
-  Serial.print ("mx: "); Serial.print (mx); Serial.println (" nT");
-  Serial.print ("my: "); Serial.print (my); Serial.println (" nT");
-  Serial.print ("mz: "); Serial.print (mz); Serial.println (" nT");
-  Serial.print ("t: "); Serial.print (t); Serial.println (" degrees C");
-  Serial.print ("pres: "); Serial.print (pres); Serial.println (" mBar");
-  Serial.print ("alt: "); Serial.print (alt); Serial.println (" Meters");
-  Serial.println ("");
+  Serial.println("");
+  Serial.println("Default Values");
+  Serial.print("ax: ");
+  Serial.print(ax);
+  Serial.println(" m/s^2");
+  Serial.print("ay: ");
+  Serial.print(ay);
+  Serial.println(" m/s^2");
+  Serial.print("az: ");
+  Serial.print(az);
+  Serial.println(" m/s^2");
+  Serial.print("gx: ");
+  Serial.print(gx);
+  Serial.println(" rad/s^2");
+  Serial.print("gy: ");
+  Serial.print(gy);
+  Serial.println(" rad/s^2");
+  Serial.print("gz: ");
+  Serial.print(gz);
+  Serial.println(" rad/s^2");
+  Serial.print("mx: ");
+  Serial.print(mx);
+  Serial.println(" nT");
+  Serial.print("my: ");
+  Serial.print(my);
+  Serial.println(" nT");
+  Serial.print("mz: ");
+  Serial.print(mz);
+  Serial.println(" nT");
+  Serial.print("t: ");
+  Serial.print(t);
+  Serial.println(" degrees C");
+  Serial.print("pres: ");
+  Serial.print(pres);
+  Serial.println(" mBar");
+  Serial.print("alt: ");
+  Serial.print(alt);
+  Serial.println(" Meters");
+  Serial.println("");
 }
 
-void setup(void) {
+void setup(void)
+{
   Serial.begin(9600);
-  wire.begin ();
+  wire.begin();
 
-  while (!Serial) {
+  while (!Serial)
+  {
     delay(10);
   }
 
-  if (!bmp.begin(BMP085_HIGHRES, &wire)) {
-	  Serial.println("Could not find a valid BMP085 sensor, check wiring!");
-    while (1) {
-      delay (1000);
+  if (!bmp.begin(BMP085_HIGHRES, &wire))
+  {
+    Serial.println("Could not find a valid BMP085 sensor, check wiring!");
+    while (1)
+    {
+      delay(1000);
     }
   }
   Serial.println("BMP180 Found!");
 
-  if (!mpu.begin(MPU6050_I2CADDR_DEFAULT, &wire, 0)) {
+  if (!mpu.begin(MPU6050_I2CADDR_DEFAULT, &wire, 0))
+  {
     Serial.println("Failed to find MPU6050 chip");
-    while (1) {
+    while (1)
+    {
       delay(10);
     }
   }
@@ -89,27 +121,29 @@ void setup(void) {
 
   mpu.setI2CBypass(true);
 
-  //setupt motion detection
+  // setupt motion detection
   mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
   mpu.setInterruptPinLatch(true);
   mpu.setInterruptPinPolarity(true);
   mpu.setMotionInterrupt(true);
 
-  if(!mag.begin(&wire))
+  if (!mag.begin(&wire))
   {
     /* There was a problem detecting the HMC5883 ... check your connections */
     Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
-    while(1) {
-      delay (1000);
+    while (1)
+    {
+      delay(1000);
     };
   }
   Serial.println("HMC5883L Found!");
 
-  calibrateSensors ();
+  calibrateSensors();
   delay(100);
 }
 
-void loop() {
+void loop()
+{
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
   Serial.print("AccelX: ");
@@ -147,34 +181,42 @@ void loop() {
   Serial.print("Real altitude = ");
   Serial.print(bmp.readAltitude(101500));
   Serial.println(" meters");
-  
-  sensors_event_t event; 
-  
+
+  sensors_event_t event;
+
   mag.getEvent(&event);
-  Serial.print("X: "); Serial.print(event.magnetic.x); Serial.print("  ");
-  Serial.print("Y: "); Serial.print(event.magnetic.y); Serial.print("  ");
-  Serial.print("Z: "); Serial.print(event.magnetic.z); Serial.print("  ");Serial.println("uT");
+  Serial.print("X: ");
+  Serial.print(event.magnetic.x);
+  Serial.print("  ");
+  Serial.print("Y: ");
+  Serial.print(event.magnetic.y);
+  Serial.print("  ");
+  Serial.print("Z: ");
+  Serial.print(event.magnetic.z);
+  Serial.print("  ");
+  Serial.println("uT");
   float heading = atan2(event.magnetic.y, event.magnetic.x);
-  
+
   // Once you have your heading, you must then add your 'Declination Angle', which is the 'Error' of the magnetic field in your location.
   // Find yours here: http://www.magnetic-declination.com/
   // Mine is: -13* 2' W, which is ~13 Degrees, or (which we need) 0.22 radians
   // If you cannot find your Declination, comment out these two lines, your compass will be slightly off.
   // float declinationAngle = 0.22;
   // heading += declinationAngle;
-  
+
   // Correct for when signs are reversed.
-  if(heading < 0)
-    heading += 2*PI;
-    
+  if (heading < 0)
+    heading += 2 * PI;
+
   // Check for wrap due to addition of declination.
-  if(heading > 2*PI)
-    heading -= 2*PI;
-   
+  if (heading > 2 * PI)
+    heading -= 2 * PI;
+
   // Convert radians to degrees for readability.
-  float headingDegrees = heading * 180/M_PI; 
-  
-  Serial.print("Heading (degrees): "); Serial.println(headingDegrees);
-  Serial.println ("");
+  float headingDegrees = heading * 180 / M_PI;
+
+  Serial.print("Heading (degrees): ");
+  Serial.println(headingDegrees);
+  Serial.println("");
   delay(500);
 }

@@ -74,6 +74,18 @@ UltrasonicSensor::UltrasonicSensor(int pin)
     //do nothing
 }
 
+// long UltrasonicSensor::on () {
+//     pinMode(pin1, OUTPUT);
+//     digitalWrite(pin1, HIGH);
+// }
+
+// long UltrasonicSensor::offAndRead () {
+//     pinMode(pin1, OUTPUT);
+//     digitalWrite(pin1, LOW);
+//     pinMode(pin1, INPUT);
+
+// }
+
 long UltrasonicSensor::duration(uint32_t timeout) {
     pinMode(pin1, OUTPUT);
     digitalWrite(pin1, LOW);

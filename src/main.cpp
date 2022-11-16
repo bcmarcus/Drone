@@ -31,30 +31,30 @@
 
 // Addresses for this node. CHANGE THESE FOR EACH NODE!
 
-#define NETWORKID     0   // Must be the same for all nodes
-#define MYNODEID      2   // My node ID
-#define TONODEID      1   // Destination node ID
+#define NETWORKID 0 // Must be the same for all nodes
+#define MYNODEID 2  // My node ID
+#define TONODEID 1  // Destination node ID
 
 // RFM69 frequency, uncomment the frequency of your module:
 
-#define FREQUENCY   RF69_433MHZ
+#define FREQUENCY RF69_433MHZ
 // #define FREQUENCY     RF69_915MHZ
 
 // AES encryption (or not):
 
-#define ENCRYPT       true // Set to "true" to use encryption
-#define ENCRYPTKEY    "TOPSECRETPASSWRD" // Use the same 16-byte key on all nodes
+#define ENCRYPT true                  // Set to "true" to use encryption
+#define ENCRYPTKEY "TOPSECRETPASSWRD" // Use the same 16-byte key on all nodes
 
 // Use ACKnowledge when sending messages (or not):
 
-#define USEACK        false // Request ACKs or not
+#define USEACK false // Request ACKs or not
 
 // Packet sent/received indicator LED (optional):
 
-#define LED           9 // LED positive pin
-#define GND           8 // LED ground pin
+#define LED 9 // LED positive pin
+#define GND 8 // LED ground pin
 
-#define BUFFERLEN     10
+#define BUFFERLEN 10
 #define RFM69_RST_PIN 25
 
 // Create a library object for our RFM69HCW module:
@@ -67,8 +67,8 @@ void setup()
 
   Serial.begin(9600);
   Serial.print("Node ");
-  Serial.print(MYNODEID,DEC);
-  Serial.println(" ready");  
+  Serial.print(MYNODEID, DEC);
+  Serial.println(" ready");
 
   // Set up the indicator LED (optional):
 
@@ -105,12 +105,6 @@ void loop()
 
   // If there is any serial input, add it to the buffer:
 
-
-
-
-
-
-
   // test //
   // delay(100);
   // sendlength = 5;
@@ -145,14 +139,7 @@ void loop()
   // }
 
   // sendlength = 0; // reset the packet
-  // // test // 
-
-
-
-
-
-
-
+  // // test //
 
   if (Serial.available() > 0)
   {
@@ -169,7 +156,6 @@ void loop()
     if ((input == '\r') || (sendlength == BUFFERLEN - 1)) // CR or buffer full
     {
       // Send the packet!
-
 
       Serial.print("sending to node ");
       Serial.print(TONODEID, DEC);
@@ -241,7 +227,7 @@ void loop()
 void Blink(byte PIN, int DELAY_MS)
 // Blink an LED for a given number of ms
 {
-  digitalWrite(PIN,HIGH);
+  digitalWrite(PIN, HIGH);
   delay(DELAY_MS);
-  digitalWrite(PIN,LOW);
+  digitalWrite(PIN, LOW);
 }

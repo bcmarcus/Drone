@@ -39,6 +39,8 @@ namespace Robot {
     class UltrasonicSensor : public Sensor {
       public:
         UltrasonicSensor(int pin);
+        // long on ();
+        // long off ();
         long MeasureInCentimeters(uint32_t timeout = 1000000L);
         long MeasureInMillimeters(uint32_t timeout = 1000000L);
         long MeasureInInches(uint32_t timeout = 1000000L);

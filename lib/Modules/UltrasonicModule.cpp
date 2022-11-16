@@ -23,9 +23,9 @@ UltrasonicModule::UltrasonicModule (int8_t pin1, int8_t pin2, int8_t pin3, int8_
    //**//
 }
 
-long UltrasonicModule::pulse (int pin, uint32_t ms) {
+long UltrasonicModule::pulse (int pinPos, uint32_t ms) {
    Sensor* s = nullptr;
-   switch (pin) {
+   switch (pinPos) {
       case 1:
          s = s1;
          break;
@@ -50,5 +50,12 @@ long UltrasonicModule::pulse (int pin, uint32_t ms) {
       return -1;
    }
    
-   return ((UltrasonicSensor*) s)->MeasureInCentimeters();
+   return ((UltrasonicSensor*) s)->MeasureInCentimeters(ms);
 }
+
+// long* UltrasonicModule::multiPulse (int* pins, int numpins, uint32_t ms) {
+//    for (int i = 0; i < numpins; i++) {
+
+//    }
+//    this->
+// }

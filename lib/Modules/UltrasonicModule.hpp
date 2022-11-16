@@ -14,8 +14,8 @@ namespace Robot {
          public:
             UltrasonicModule (int8_t pin1 = -1, int8_t pin2 = -1, int8_t pin3 = -1, int8_t pin4 = -1, int8_t pin5 = -1, int8_t pin6 = -1);
 
-         private:
-            long pulse (int pin, uint32_t ms); 
+            long pulse (int pinPos, uint32_t ms); 
+            // long* multiPulse (int* pins, int numPins, uint32_t ms); 
       };
    };
 };
