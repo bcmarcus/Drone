@@ -1,0 +1,48 @@
+Servo.h file had these changes
+
+
+#define MIN_PULSE_WIDTH         5     // the shortest pulse sent to a servo  
+#define MAX_PULSE_WIDTH      2400     // the longest pulse sent to a servo 
+#define DEFAULT_PULSE_WIDTH  1500     // default pulse width when servo is attached
+#define REFRESH_INTERVAL      100     // minumim time to refresh servos in microseconds 
+
+void writeMicroseconds(double value); // Write pulse width in microseconds 
+
+
+Servo.cpp had these changes
+
+
+uint8_t Servo::attach(int pin, int minimum, int maximum)
+{
+	if (servoIndex < MAX_SERVOS) {
+		pinMode(pin, OUTPUT);
+		servo_pin[servoIndex] = pin;
+		servo_ticks[servoIndex] = usToTicks(DEFAULT_PULSE_WIDTH);
+		servo_active_mask |= (1<<servoIndex);
+		min_ticks = usToTicks(minimum);
+		max_ticks = usToTicks(maximum);
+		if ((IRQ_NUMBER_t)timer >= NVIC_NUM_INTERRUPTS) {
+			timer.begin(isr, 1);
+		}
+	}
+	return servoIndex;
+}
+
+void Servo::writeMicroseconds(double value)
+{
+	value = usToTicks(value);
+	if (value < min_ticks) {
+		value = min_ticks;
+	} else if (value > max_ticks) {
+		value = max_ticks;
+	}
+	if (servoIndex >= MAX_SERVOS) return;
+	servo_ticks[servoIndex] = value;
+}
+
+
+
+
+
+The higher the pwm type (where oneshot125 > oneshot42), there is finer fidelity, however it cannot be polled nearly as often
+

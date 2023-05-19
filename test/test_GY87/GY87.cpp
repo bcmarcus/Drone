@@ -8,10 +8,10 @@
 Adafruit_MPU6050 mpu;
 Adafruit_BMP085 bmp;
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
-TwoWire wire = Wire1;
+TwoWire wire = Wire;
 
 float ax, ay, az, gx, gy, gz, mx, my, mz, t, pres, alt;
-uint16_t calibrationCount = 100;
+uint16_t calibrationCount = 500;
 
 void calibrateSensors()
 {
@@ -122,7 +122,8 @@ void setup(void)
   mpu.setI2CBypass(true);
 
   // setupt motion detection
-  mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
+  mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
+  mpu.setHighPassFilter(MPU6050_HIGHPASS_2_5_HZ);
   mpu.setInterruptPinLatch(true);
   mpu.setInterruptPinPolarity(true);
   mpu.setMotionInterrupt(true);

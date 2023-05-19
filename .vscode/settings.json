@@ -1,6 +1,16 @@
 {
   "files.associations": {
     "string": "cpp",
-    "initializer_list": "cpp"
+    "initializer_list": "cpp",
+    "termios.h": "c",
+    "stdio.h": "c",
+    "array": "cpp",
+    "system_error": "cpp",
+    "functional": "cpp",
+    "tuple": "cpp",
+    "type_traits": "cpp",
+    "utility": "cpp",
+    "random": "cpp",
+    "*.tcc": "cpp"
   }
 }

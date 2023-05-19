@@ -7,10 +7,12 @@
 byte start_address = 0;
 byte end_address = 127;
 
+TwoWire wire = Wire;
+
 void setup()
 {
   byte rc;
-  Wire1.begin();
+  wire.begin();
 
   Serial.begin(9600);
   Serial.println("\nI2C Scanner");
@@ -22,8 +24,8 @@ void setup()
   for( byte addr  = start_address;
             addr <= end_address;
             addr++ ) {
-      Wire1.beginTransmission(addr);
-      rc = Wire1.endTransmission();
+      wire.beginTransmission(addr);
+      rc = wire.endTransmission();
 
       if (addr<16) Serial.print("0");
       Serial.print(addr,HEX);
@@ -40,8 +42,8 @@ void setup()
   for( byte addr  = start_address;
             addr <= end_address;
             addr++ ) {
-      Wire1.beginTransmission(addr);
-      rc = Wire1.endTransmission();
+      wire.beginTransmission(addr);
+      rc = wire.endTransmission();
       if (rc == 0) {
         Serial.print(addr,HEX); Serial.print(" = ");
         switch (addr) {
