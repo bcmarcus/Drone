@@ -9,7 +9,7 @@
 
 // UNPLUG, THEN WAIT FOR PROMPT, AND PLUG IN
 
-const int motorPin = 15;
+const int motorPin = 0;
 const int minThrottle = 1000; // PWM minimum value
 const int maxThrottle = 2000; // PWM maximum value
 bool calibrationMode = false;

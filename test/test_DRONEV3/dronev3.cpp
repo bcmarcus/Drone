@@ -14,26 +14,31 @@
 
 
 
-// BLUETOOTH // 
+// :: BLUETOOTH :: // 
 // Define the RX and TX pins for the Bluetooth module
-const int rxPin = 7;
-const int txPin = 8;
+const int rxPin = 15;
+const int txPin = 14;
 
 // Initialize the SoftwareSerial library for communication with the Bluetooth module
 SoftwareSerial bluetooth(rxPin, txPin);
 
+// baud
+// const int baudRate = 460800;
+const int baudRate = 230400;
+// const int baudRate = 9600;
+
 // timeout to kill
 unsigned long lastReceivedTime = 0;
 const unsigned long TIMEOUT = 10000; // 10 seconds
-// BLUETOOTH // 
+const int loopDelay = 1000 * 1000; // 1000 nanoseconds
+// :: BLUETOOTH :: // 
 
 
 
-// MOTORS //
+// :: MOTORS :: //
 // Motor pins
-
-// {36, 33, 37, 15}
-const int motorPins[4] = {36, 33, 37, 15};
+// const int motorPins[4] = {0, 29, 33, 19};
+const int motorPins[4] = {33, 19, 0, 29};
 const int numMotors = 4;
 const int minThrottle = 1000;
 const int maxThrottle = 2000;
@@ -42,19 +47,28 @@ const int maxThrottle = 2000;
 // const int baseThrottle = 1150;
 
 //testing number
-static int baseThrottles[4] = {1050, 1050, 1050, 1050}; // Replace 1500 with the appropriate value for your drone
+static int landThrottles[4] = {1050, 1050, 1050, 1050};
+// static int takeoffThrottles[4] = {1050, 1050, 1050, 1050};
+static int takeoffThrottles[4] = {1325, 1325, 1250, 1250};
+static float currentThrottles[4];
 
 Servo motors[numMotors];
+// :: MOTORS :: //
 
 
+// :: PID :: // 
+float multiplier = loopDelay / 1000.0 / 1000.0;
 
-// PID variables
-// float multiplier = ;
+// float Kp = 0.05 * multiplier;
+// float Ki = 0.001 * multiplier;
+// float Kd = 0.001 * multiplier;
+// float Kb = 0.001 * multiplier;
 
-float Kp = 5;
-float Ki = 0.1;
-float Kd = 0.1;
-float Kb = 0.1;
+float Kp = 0.05 * multiplier;
+float Ki = 0;
+float Kd = 0;
+float Kb = 0;
+
 float error_x, error_y, error_z, error_sum_x, error_sum_y, error_sum_z, error_prev_x, error_prev_y, error_prev_z;
 
 float ax, ay, az, gx, gy, gz, mx, my, mz, t, pres, alt;
@@ -66,22 +80,47 @@ uint16_t calibrationCount = 500;
 
 static boolean ready = false;
 static boolean dry = true;
-// MOTORS //
+static boolean testNoPrint = false;
+// :: PID :: // 
 
 
 
-// SENSORS // 
+// :: SENSORS :: // 
 Adafruit_MPU6050 mpu;
 Adafruit_BMP085 bmp;
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
-TwoWire wire = Wire;
+TwoWire wire = Wire1;
 
 #define RETRIES 3
 static boolean hasBMP = false;
 static boolean hasMPU = false;
 static boolean hasMAG = false;
-// SENSORS // 
+// :: SENSORS :: // 
 
+
+// :: BATTERY :: //
+const int batteryPins[] = {20, 21, 22, 23};
+const int numBatteries = 4;
+const float maxVoltage = 2.08;
+const float minVoltage = 1.7;
+const float voltageRange = maxVoltage - minVoltage;
+volatile bool battery20 = false;
+volatile bool battery5 = false;
+// :: BATTERY :: //
+
+void customPrint (String data) {
+  if (testNoPrint) {
+    return;
+  }
+  if (battery20) {
+    data = data + " // " + "BATTERY IS LOW, PLAN TO RETURN TO BASE.";
+  }
+  if (battery5) {
+    data = data + " // " + "BATTERY AT 5, IF YOU DO NOT SEND AN OVERRIDE COMMAND WITHIN 30 SECONDS, THE DRONE WILL TURN ITSELF OFF.";
+  }
+  Serial.println (data);
+  bluetooth.println (data);
+}
 
 void calibrateSensors()
 {
@@ -90,7 +129,7 @@ void calibrateSensors()
   for (int i = 0; i < RETRIES; i++) {
     if (bmp.begin(BMP085_HIGHRES, &wire))
     {
-      Serial.println("BMP180 Found!");
+      customPrint("BMP180 Found!");
       hasBMP = true;
       break;
     }
@@ -100,7 +139,7 @@ void calibrateSensors()
   for (int i = 0; i < RETRIES; i++) {
     if (mpu.begin(MPU6050_I2CADDR_DEFAULT, &wire, 0))
     {
-      Serial.println("MPU6050 Found!");
+      customPrint("MPU6050 Found!");
       hasMPU = true;
       break;
     }
@@ -118,7 +157,7 @@ void calibrateSensors()
 
   for (int i = 0; i < RETRIES; i++) {
     if (mag.begin(&wire)) {
-      Serial.println("HMC5883L Found!");
+      customPrint("HMC5883L Found!");
       hasMAG = true;
       break;
     }
@@ -166,12 +205,26 @@ void calibrateSensors()
 
 String formatFloat(float val) {
   char out[7];
-  dtostrf(val, 7, 2, out);
+  dtostrf(val, 7, 4, out);
   return String(out);
 }
 
+String arrtostr(int arr[], int count) {
+  if (count == 0) {
+    return "[]";
+  }
+
+  String out = "[";
+  for (int i = 0; i < count - 1; i++) {
+    out = out + arr[i] + ", ";
+  }
+  out = out + arr[count - 1] + "]";
+
+  return out;
+}
+
 void calibrateESC() {
-  Serial.println("Calibration started. Now power the motors.");
+  customPrint("Calibration started. Now power the motors.");
 
   for (int i = 0; i < numMotors; i++) {
     motors[i].writeMicroseconds(maxThrottle);
@@ -183,10 +236,10 @@ void calibrateESC() {
   }
   delay(2000);
 
-  Serial.println("Calibration complete. You can now control the motors.");
+  customPrint("Calibration complete. You can now control the motors.");
 }
 
-void runMotors(int throttle[]) {
+void runMotors(float throttle[]) {
   for (int i = 0; i < numMotors; i++) {
     motors[i].writeMicroseconds(throttle[i]);
   }
@@ -202,8 +255,7 @@ void resetPID () {
   error_prev_x = 0;
   error_prev_y = 0;
   error_prev_z = 0;
-  Serial.println("PID Reset!");
-  bluetooth.println("PID Reset!");
+  customPrint("PID Reset!");
 }
 
 void killMotors() {
@@ -212,24 +264,32 @@ void killMotors() {
   }
   resetPID();
 
-  Serial.println("Kill command received. Motors shut down.");
-  bluetooth.println("Killing motors...");
+  for (int i = 0; i < numMotors; i++) {
+    currentThrottles[i] = takeoffThrottles[i];
+  }
+  
+  customPrint("Kill command received. Motors shut down.");
   ready = false;
 }
 
+void resetBatteryData() {
+  battery20 = false;
+  battery5 = false;
+}
 
 void restartSequence() {
-  bluetooth.println("Preparing motors...");
+  killMotors();
+  customPrint("Preparing motors...");
   ready = true;
   dry = false;
-  bluetooth.println("Motors starting!");
+  customPrint("Motors starting!");
 }
 
 void drySequence() {
-  bluetooth.println("Preparing dry run...");
+  customPrint("Preparing dry run...");
   ready = true;
   dry = true;
-  bluetooth.println("Dry run beginning!");
+  customPrint("Dry run beginning!");
 }
 
 void status () {
@@ -238,59 +298,101 @@ void status () {
   payload = payload + "Ki: " + formatFloat(Ki) + " // ";
   payload = payload + "Kd: " + formatFloat(Kd) + " // ";
   payload = payload + "Kb: " + formatFloat(Kb) + " // ";
-  payload = payload + "baseThrottle: " + String(baseThrottle) + " // ";
+  payload = payload + "Takeoff Throttles: " + arrtostr(takeoffThrottles, 4) + " // ";
   payload = payload + "MPU: " + (hasMPU ? "Yes" : "No") + " // ";
   payload = payload + "BMP: " + (hasBMP ? "Yes" : "No") + " // ";
   payload = payload + "MAG: " + (hasMAG ? "Yes" : "No") + " // ";
   payload = payload + "Ready: " + (ready ? "Yes" : "No") + " // ";
   payload = payload + "Dry: " + (dry ? "Yes" : "No") + " // ";
+  
+  for (int i = 0; i < numBatteries; i++) {
+    float voltage = (analogRead(batteryPins[i]) / 1023.0) * 3.3;
+    int percentage = (voltage - minVoltage) / voltageRange * 100;
+    payload = payload + "Battery " + String ((i + 1)) + ": " + formatFloat(percentage) + "%" + " // ";
+  }
+
   // add battery status when available
-  Serial.println(payload);
-  bluetooth.println(payload);
+  customPrint(payload);
+}
+
+void checkBattery() {
+  for (int i = 0; i < numBatteries; i++) {
+    float voltage = (analogRead(batteryPins[i]) / 1023.0) * 3.3;
+    int percentage = (voltage - minVoltage) / voltageRange * 100;
+    if (percentage < 20) {
+      battery20 = true;
+    }
+    if (percentage < 5) {
+      battery5 = true;
+    }
+  }
+}
+
+void setTakeoffThrottle (int motor, float value) {
+  takeoffThrottles [motor - 1] = value;
+  customPrint("TakeoffThrottle set.");
 }
 
 void takeoff() {
-  Serial.println("Attempting takeoff...");
-  bluetooth.println("Attempting takeoff...");
-  baseThrottle = 1400;
+  for (int i = 0; i < numMotors; i++) {
+    currentThrottles[i] = takeoffThrottles[i];
+  }
+
+  customPrint("Attempting takeoff...");
 }
 
 void land() {
-  Serial.println("Attempting landing...");
-  bluetooth.println("Attempting landing...");
-  baseThrottle = 1050;
+  for (int i = 0; i < numMotors; i++) {
+    currentThrottles[i] = landThrottles[i];
+  }
+  customPrint("Attempting landing...");
+}
+
+float get_motor_speed(int motor) {
+  return currentThrottles[motor - 1];
+}
+
+void calibrateBluetooth() {
+  bluetooth.begin(230400);
+  bluetooth.print("AT+NAMEDrone1");
+  delay(1000);
+  bluetooth.print("AT+BAUD4"); // AT command to set baud rate to 230400
+  delay(1000);
+  bluetooth.end();
+  bluetooth.begin(9600);
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(baudRate);
   bluetooth.begin(9600);
-  // while (!Serial) {
-  //   delay(10); // Wait for Serial Monitor to open
-  // }
-  bluetooth.println("Setup Beginning!");
-  Serial.println("Setup Beginning!");
+  // calibrateBluetooth();
+
+  customPrint("Setup Beginning!");
 
   for (int i = 0; i < numMotors; i++) {
     motors[i].attach(motorPins[i]);
   }
 
+  for (int i = 0; i < numBatteries; i++) {
+    pinMode(batteryPins[i], INPUT);
+  }
+
+  // bluetooth //
   calibrateESC();
   calibrateSensors();
 
   if (!hasMPU) {
-    Serial.println("No Mpu found");
-    bluetooth.println("No Mpu found");
+    customPrint("No Mpu found");
     while (1){
-      Serial.println("No Mpu found");
-      bluetooth.println("No Mpu found");
+      customPrint("No Mpu found");
       delay (1000);
     }
   }
 
   delay(100);
-  bluetooth.println("Setup Complete! Preparing to launch!");
-  Serial.println("Setup Complete! On Standby");
+  customPrint("Setup Complete! On Standby");
   delay(1000);
+  killMotors();
 }
 
 void loop() {
@@ -320,6 +422,12 @@ void loop() {
     else if (s.equalsIgnoreCase("LAND")) {
       land();
     }
+    else if (s.equalsIgnoreCase("PRINT")) {
+      testNoPrint = false;
+    }
+    else if (s.equalsIgnoreCase("NOPRINT")) {
+      testNoPrint = true;
+    }
     else if (s.equalsIgnoreCase("RECALIBRATE")) {
       calibrateESC();
       calibrateSensors();
@@ -328,46 +436,49 @@ void loop() {
       drySequence();
     }
     else {
-      // check pid
+      
+      
+      
+      // change values
       String identifier = s.substring(0, 2);
       identifier.toUpperCase();
 
       int motorNumber = s.substring(0, s.indexOf(' ')).toInt();
 
-      if (identifier == "KP" || identifier == "KI" || identifier == "KD" || identifier == "KB" || identifier == "BT") {
+      if (identifier == "KP" || identifier == "KI" || identifier == "KD" || identifier == "KB" || identifier == "TT") {
         String valueStr = s.substring(2);
         float value = valueStr.toFloat();
 
         if (identifier == "KP") {
           Kp = value;
-          Serial.print("Kp set to: ");
-          bluetooth.println("Kp set.");
+          customPrint("Kp set.");
         } else if (identifier == "KI") {
           Ki = value;
-          Serial.print("Ki set to: ");
-          bluetooth.println("Ki set.");
+          customPrint("Ki set.");
         } else if (identifier == "KD") {
           Kd = value;
-          Serial.print("Kd set to: ");
-          bluetooth.println("Kd set.");
+          customPrint("Kd set.");
         } else if (identifier == "KB") {
           Kb = value;
-          Serial.print("Kb set to: ");
-          bluetooth.println("Kb set.");
-        } else if (identifier == "BT") {
-          baseThrottle = value;
-          Serial.print("BaseThrottle set.");
-          bluetooth.println("BaseThrottle set.");
+          customPrint("Kb set.");
+        } else if (identifier == "TT") {
+          int motorNumber = s.substring(3, s.indexOf(' ', 3)).toInt();
+          if(motorNumber < 1 || motorNumber > numMotors) {
+            customPrint("Changing Takeoff Throttle: Invalid motor number.");
+          }
+          float value = s.substring(5).toFloat();
+          if (value < 1000 || value > 2000) {
+            customPrint("Changing Takeoff Throttle: Invalid throttle value.");
+          }
+          setTakeoffThrottle(motorNumber, value);
         }
-        Serial.println(value, 2);
       }
       else if(motorNumber >= 1 && motorNumber <= numMotors) {
         float throttlePercent = s.substring(s.indexOf(' ') + 1).toFloat();
         throttlePercent = constrain(throttlePercent, 0, 100);
         int throttleValue = map(throttlePercent, 0, 100, minThrottle, maxThrottle);
         motors[motorNumber - 1].writeMicroseconds(throttleValue);
-        Serial.println("Motor " + String(motorNumber) + " set to throttle " + String(throttleValue) + "%");
-        bluetooth.println("Motor " + String(motorNumber) + " set to throttle " + String(throttleValue) + "%");
+        customPrint("Motor " + String(motorNumber) + " set to throttle " + String((throttleValue - 1000) / 10) + "%");
       }
       else {
         killMotors();
@@ -375,6 +486,11 @@ void loop() {
     }
   }
   
+
+
+
+
+  // actual loop
   if (ready) {
     // Get sensor data
     sensors_event_t a, g, temp, event;
@@ -411,19 +527,24 @@ void loop() {
     error_prev_y = error_y;
     error_prev_z = error_z;
 
-    // Calculate unsaturated output for each motor
-    int unsat_throttle[numMotors];
-    unsat_throttle[0] = baseThrottle - P_x - I_x - D_x - P_y - I_y - D_y + P_z + I_z + D_z;
-    unsat_throttle[1] = baseThrottle + P_x + I_x + D_x - P_y - I_y - D_y + P_z + I_z + D_z;
-    unsat_throttle[2] = baseThrottle + P_x + I_x + D_x + P_y + I_y + D_y + P_z + I_z + D_z;
-    unsat_throttle[3] = baseThrottle - P_x - I_x - D_x + P_y + I_y + D_y + P_z + I_z + D_z;
+    // Assuming you have a function to get the current motor speed for each motor
+    float current_motor_speed_0 = get_motor_speed(1);
+    float current_motor_speed_1 = get_motor_speed(2);
+    float current_motor_speed_2 = get_motor_speed(3);
+    float current_motor_speed_3 = get_motor_speed(4);
 
-    // Apply saturation constraints to get the saturated output
-    int throttle[numMotors];
-    throttle[0] = constrain(unsat_throttle[0], minThrottle, maxThrottle);
-    throttle[1] = constrain(unsat_throttle[1], minThrottle, maxThrottle);
-    throttle[2] = constrain(unsat_throttle[2], minThrottle, maxThrottle);
-    throttle[3] = constrain(unsat_throttle[3], minThrottle, maxThrottle);
+    // Calculate unsaturated output for each motor
+    float unsat_throttle[numMotors];
+    unsat_throttle[0] = current_motor_speed_0 - P_x - I_x - D_x - P_y - I_y - D_y + P_z + I_z + D_z;
+    unsat_throttle[1] = current_motor_speed_1 + P_x + I_x + D_x - P_y - I_y - D_y + P_z + I_z + D_z;
+    unsat_throttle[2] = current_motor_speed_2 + P_x + I_x + D_x + P_y + I_y + D_y + P_z + I_z + D_z;
+    unsat_throttle[3] = current_motor_speed_3 - P_x - I_x - D_x + P_y + I_y + D_y + P_z + I_z + D_z;
+
+
+    currentThrottles[0] = constrain(unsat_throttle[0], minThrottle, maxThrottle);
+    currentThrottles[1] = constrain(unsat_throttle[1], minThrottle, maxThrottle);
+    currentThrottles[2] = constrain(unsat_throttle[2], minThrottle, maxThrottle);
+    currentThrottles[3] = constrain(unsat_throttle[3], minThrottle, maxThrottle);
 
 
 
@@ -439,10 +560,10 @@ void loop() {
 
     // back calculation for integral
     float back_calc[4];
-    back_calc[0] = Kb * (throttle[0] - unsat_throttle[0]);
-    back_calc[1] = Kb * (throttle[1] - unsat_throttle[1]);
-    back_calc[2] = Kb * (throttle[2] - unsat_throttle[2]);
-    back_calc[3] = Kb * (throttle[3] - unsat_throttle[3]);
+    back_calc[0] = Kb * (currentThrottles[0] - unsat_throttle[0]);
+    back_calc[1] = Kb * (currentThrottles[1] - unsat_throttle[1]);
+    back_calc[2] = Kb * (currentThrottles[2] - unsat_throttle[2]);
+    back_calc[3] = Kb * (currentThrottles[3] - unsat_throttle[3]);
 
     // Calculate average back-calculation terms for x, y, and z
     float avg_back_calc_x = (back_calc[0] - back_calc[1] + back_calc[2] - back_calc[3]) / 4.0;
@@ -459,27 +580,24 @@ void loop() {
 
     // Run motors with calculated throttles
     if (!dry) {
-      runMotors(throttle);
+      runMotors(currentThrottles);
     }
 
     String payload = 
-      "M1: " + String(throttle[0]) + " // " + 
-      "M2: " + String(throttle[1]) + " // " + 
-      "M3: " + String(throttle[2]) + " // " + 
-      "M4: " + String(throttle[3]);
+      "M1: " + String(currentThrottles[0]) + " // " + 
+      "M2: " + String(currentThrottles[1]) + " // " + 
+      "M3: " + String(currentThrottles[2]) + " // " + 
+      "M4: " + String(currentThrottles[3]);
 
-    if (dry) {
-      payload = payload + " // " + 
-        "P_X: " + formatFloat(P_x) + " // " + "P_Y: " + formatFloat(P_y) + " // " + "P_Z: " + formatFloat(P_z) + " // " +
-        "I_x: " + formatFloat(I_x) + " // " + "I_y: " + formatFloat(I_y) + " // " + "I_z: " + formatFloat(I_z) + " // " +
-        "D_x: " + formatFloat(D_x) + " // " + "D_y: " + formatFloat(D_y) + " // " + "D_z: " + formatFloat(D_z);
+    payload = payload + " // " + 
+      "P_X: " + formatFloat(P_x) + " // " + "P_Y: " + formatFloat(P_y) + " // " + "P_Z: " + formatFloat(P_z) + " // " +
+      "I_x: " + formatFloat(I_x) + " // " + "I_y: " + formatFloat(I_y) + " // " + "I_z: " + formatFloat(I_z) + " // " +
+      "D_x: " + formatFloat(D_x) + " // " + "D_y: " + formatFloat(D_y) + " // " + "D_z: " + formatFloat(D_z);
 
-      payload = payload + " // " + 
-        "error_x: " + formatFloat(error_x) + " // " + "error_y: " + formatFloat(error_y) + " // " + "error_z: " + formatFloat(error_z);
-    }
+    payload = payload + " // " + 
+      "error_x: " + formatFloat(error_x) + " // " + "error_y: " + formatFloat(error_y) + " // " + "error_z: " + formatFloat(error_z);
 
-    Serial.println(payload + " \n");
-    bluetooth.println(payload);
-    delay (10);
+    customPrint(payload);
+    delayNanoseconds (loopDelay);
   }
 }

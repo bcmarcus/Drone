@@ -14,8 +14,9 @@
 #include <functional>
 #include <sstream>
 #include <MPU6050_light.h>
+#include <cstring>
 
-
+#define GYRO_COEFF 0.9
 // :: BLUETOOTH :: // 
 // Define the RX and TX pins for the Bluetooth module
 const int rxPin = 15;
@@ -53,7 +54,7 @@ const int maxThrottle = 2000;
 
 //testing number
 static int landThrottles[4] = {1050, 1050, 1050, 1050};
-static int takeoffThrottles[4] = {1050, 1050, 1050, 1050};
+static int takeoffThrottles[4] = {1150, 1150, 1150, 1150};
 // static int takeoffThrottles[4] = {1300, 1300, 1250, 1250};
 static float currentThrottles[4];
 
@@ -76,12 +77,11 @@ uint32_t timer = 0;
 
 // KP BETWEEN 25 AND 50
 float Kp = 10;
-float Ki = 0.0001;
+float Ki = 0.0005;
 float Kd = 0;
 float Kb = 0;
 
-// YAW_MULT BETWEEN 0.0002 AND 0.00001
-float yaw_multiplier = 0.00001;
+float yaw_multiplier = 0.002;
 float multiplier = 0.0001;
 
 
@@ -303,9 +303,10 @@ void calibrateSensors()
   }
 
   for (int i = 0; i < RETRIES; i++) {
-    if (mpu.begin(0, 0) == 0)
+    if (mpu.begin(1, 1) == 0)
     {
       customPrint("MPU6050 Found!");
+      mpu.setFilterGyroCoef(GYRO_COEFF);
       hasMPU = true;
       break;
     }
@@ -354,8 +355,10 @@ void calibrateSensors()
 }
 
 const std::string formatFloat(float val) {
-  static char out[7];
-  dtostrf(val, 7, 5, out);
+  static char out[8];  // Increase the size of the out array to accommodate null terminator
+  std::memset(out, ' ', sizeof(out));  // Initialize the array with spaces
+  dtostrf(val, 6, 5, out);  // Use 6 instead of 7 to leave space for the potential negative sign
+  out[7] = '\0';  // Add null terminator at the end
   return out;
 }
 
@@ -374,6 +377,25 @@ std::string arrtostr(int arr[], int count) {
   return payloadStream.str();
 }
 
+void printSensorValues (boolean override = false) {
+  if (noPrint && !override) {
+    return;
+  }
+  sensors_event_t event;
+  mpu.update();
+  mag.getEvent(&event);
+
+  std::stringstream payloadStream;
+  payloadStream 
+    << "Acceleration (m/s^2) => X: " << formatFloat(mpu.getAccX()) << ", Y: " << formatFloat(mpu.getAccY()) << ", Z: " << formatFloat(mpu.getAccZ()) << " ||| "
+    << "Gyro (deg/s^2) => X: " << formatFloat(mpu.getGyroX()) << ", Y: " << formatFloat(mpu.getGyroY()) << ", Z: " << formatFloat(mpu.getGyroZ()) << " ||| "
+    << "Angle (deg) => X: " << formatFloat(mpu.getAngleX()) << ", Y: " << formatFloat(mpu.getAngleY()) << ", Z: " << formatFloat(mpu.getAngleZ()) << " ||| "
+    << "AccAngle (deg) => X: " << formatFloat(mpu.getAccAngleX()) << ", Y: " << formatFloat(mpu.getAccAngleY()) << " ||| "
+    << "Magnetic (uT) => X: " << formatFloat(event.magnetic.x) << "  " << "Y: " << formatFloat(event.magnetic.y) << "  " << "Z: " << formatFloat(event.magnetic.z);
+  
+  customPrint(payloadStream.str().c_str(), override);
+}
+
 void printPIDValues (boolean override = false) {
   if (noPrint && !override) {
     return;
@@ -390,7 +412,7 @@ void printPIDValues (boolean override = false) {
     << "I_roll: " << formatFloat(I_roll) << " // " << "I_pitch: " << formatFloat(I_pitch) << " // " << "I_yaw: " << formatFloat(I_yaw) << " // "
     << "D_roll: " << formatFloat(D_roll) << " // " << "D_pitch: " << formatFloat(D_pitch) << " // " << "D_yaw: " << formatFloat(D_yaw) << " // "
     << "error_roll: " << formatFloat(error_roll) << " // " << "error_pitch: " << formatFloat(error_pitch) << " // " << "error_yaw: " << formatFloat(error_yaw);
-
+    
   customPrint(payloadStream.str().c_str(), override);
 }
 
@@ -426,6 +448,9 @@ void resetPID () {
   error_prev_roll = 0;
   error_prev_pitch = 0;
   error_prev_yaw = 0;
+  mpu.resetAngleX();
+  mpu.resetAngleY();
+  mpu.resetAngleZ();
   customPrint("PID Reset!");
 }
 
@@ -436,12 +461,16 @@ void kill() {
 
   displaySensors = false;
   noPrint = false;
-  customPrint("Kill command received. Motors shut down.");
 
   printPIDValues();
+  printSensorValues();
+
+  customPrint("Kill command received. Motors shut down.");
+
+  mpu.update();
   takeoff();
   resetPID();
-  
+
   counter = 0;
   ready = false;
 }
@@ -453,6 +482,7 @@ void resetBatteryData() {
 
 void restartSequence() {
   kill();
+  printPIDValues();
   customPrint("Preparing motors...");
   ready = true;
   dry = false;
@@ -739,8 +769,7 @@ void loop() {
 
     error_roll = mpu.getAngleX() * multiplier;
     error_pitch = mpu.getAngleY() * multiplier;
-    error_yaw = -1 * mpu.getAngleZ() * yaw_multiplier * multiplier;
-
+    error_yaw = mpu.getAngleZ() * yaw_multiplier * multiplier;
 
     // // Calculate PID terms
     // float P_roll = Kp_roll * error_roll;
@@ -802,10 +831,10 @@ void loop() {
 
     // Calculate unsaturated output for each motor
     float unsat_throttle[numMotors];
-    unsat_throttle[0] = current_motor_speed_0 - P_roll - I_roll - D_roll + P_pitch + I_pitch + D_pitch + P_yaw + I_yaw + D_yaw; // Motor 1 (positive roll, positive pitch, clockwise)
-    unsat_throttle[1] = current_motor_speed_1 - P_roll - I_roll - D_roll - P_pitch - I_pitch - D_pitch - P_yaw - I_yaw - D_yaw; // Motor 2 (positive roll, negative pitch, counterclockwise)
-    unsat_throttle[2] = current_motor_speed_2 + P_roll + I_roll + D_roll - P_pitch - I_pitch - D_pitch + P_yaw + I_yaw + D_yaw; // Motor 3 (negative roll, negative pitch, clockwise)
-    unsat_throttle[3] = current_motor_speed_3 + P_roll + I_roll + D_roll + P_pitch + I_pitch + D_pitch - P_yaw - I_yaw - D_yaw; // Motor 4 (negative roll, positive pitch, counterclockwise)
+    unsat_throttle[0] = current_motor_speed_0 - P_roll - I_roll - D_roll + P_pitch + I_pitch + D_pitch - P_yaw - I_yaw - D_yaw; // Motor 1 (positive roll, positive pitch, clockwise)
+    unsat_throttle[1] = current_motor_speed_1 - P_roll - I_roll - D_roll - P_pitch - I_pitch - D_pitch + P_yaw + I_yaw + D_yaw; // Motor 2 (positive roll, negative pitch, counterclockwise)
+    unsat_throttle[2] = current_motor_speed_2 + P_roll + I_roll + D_roll - P_pitch - I_pitch - D_pitch - P_yaw - I_yaw - D_yaw; // Motor 3 (negative roll, negative pitch, clockwise)
+    unsat_throttle[3] = current_motor_speed_3 + P_roll + I_roll + D_roll + P_pitch + I_pitch + D_pitch + P_yaw + I_yaw + D_yaw; // Motor 4 (negative roll, positive pitch, counterclockwise)
 
     currentThrottles[0] = constrain(unsat_throttle[0], minThrottle, maxThrottle);
     currentThrottles[1] = constrain(unsat_throttle[1], minThrottle, maxThrottle);
@@ -830,7 +859,7 @@ void loop() {
       elapsedMicros();
 
       printPIDValues(true);
-
+      printSensorValues(true);
       timer = millis();
     }
 
@@ -883,54 +912,64 @@ void loop() {
     sensors_event_t event;
     mpu.update();
     mag.getEvent(&event);
-    mpu.getTemp();
-    mpu.getAccX();
-    mpu.getAccY();
-    mpu.getAccZ();
-    mpu.getGyroX();
-    mpu.getGyroY();
-    mpu.getGyroZ();
-    mpu.getAccAngleX();
-    mpu.getAccAngleY();
-    mpu.getAngleX();
-    mpu.getAngleY();
-    mpu.getAngleZ();
 
-    std::stringstream payloadStream;
-    payloadStream 
-      << "Acceleration (m/s^2) => X: " << formatFloat(mpu.getAccX()) << ", Y: " << formatFloat(mpu.getAccY()) << ", Z: " << formatFloat(mpu.getAccZ()) << " ||| "
-      << "Gyro (deg/s^2) => X: " << formatFloat(mpu.getGyroX()) << ", Y: " << formatFloat(mpu.getGyroY()) << ", Z: " << formatFloat(mpu.getGyroZ()) << " ||| "
-      << "Angle (deg) => X: " << formatFloat(mpu.getAngleX()) << ", Y: " << formatFloat(mpu.getAngleY()) << ", Z: " << formatFloat(mpu.getAngleZ()) << " ||| "
-      << "AccAngle (deg) => X: " << formatFloat(mpu.getAccAngleX()) << ", Y: " << formatFloat(mpu.getAccAngleY());
-      // << "Magnetic (uT) => X: " << formatFloat(event.magnetic.x) << "  " << "Y: " << formatFloat(event.magnetic.y) << "  " << "Z: " << formatFloat(event.magnetic.z) << " ||| ";
+    printSensorValues();
+
+    // mpu.getTemp();
+    // mpu.getAccX();
+    // mpu.getAccY();
+    // mpu.getAccZ();
+    // mpu.getGyroX();
+    // mpu.getGyroY();
+    // mpu.getGyroZ();
+    // mpu.getAccAngleX();
+    // mpu.getAccAngleY();
+    // mpu.getAngleX();
+    // mpu.getAngleY();
+    // mpu.getAngleZ();
 
 
-    float heading = atan2(event.magnetic.y, event.magnetic.x);
 
-    // Once you have your heading, you must then add your 'Declination Angle', which is the 'Error' of the magnetic field in your location.
-    // Find yours here: http://www.magnetic-declination.com/
-    // Mine is: -13* 2' W, which is ~13 Degrees, or (which we need) 0.22 radians
-    // If you cannot find your Declination, comment out these two lines, your compass will be slightly off.
-    // float declinationAngle = 0.22;
-    // heading += declinationAngle;
 
-    // Correct for when signs are reversed.
-    if (heading < 0)
-      heading += 2 * PI;
 
-    // Check for wrap due to addition of declination.
-    if (heading > 2 * PI)
-      heading -= 2 * PI;
 
-    // Convert radians to degrees for readability.
-    float headingDegrees = heading * 180 / M_PI;
 
-    payloadStream
-      << "Heading (degrees): " << formatFloat(headingDegrees)
-      << "Temperature (*C): " << formatFloat(bmp.readTemperature()) << " ||| "
-      << "Pressure (Pa): " << formatFloat(bmp.readPressure()) << ", Altitude (meters): " << formatFloat(bmp.readAltitude());
 
-    customPrint(payloadStream.str().c_str());
+    // std::stringstream payloadStream;
+    // payloadStream 
+    //   << "Acceleration (m/s^2) => X: " << formatFloat(mpu.getAccX()) << ", Y: " << formatFloat(mpu.getAccY()) << ", Z: " << formatFloat(mpu.getAccZ()) << " ||| "
+    //   << "Gyro (deg/s^2) => X: " << formatFloat(mpu.getGyroX()) << ", Y: " << formatFloat(mpu.getGyroY()) << ", Z: " << formatFloat(mpu.getGyroZ()) << " ||| "
+    //   << "Angle (deg) => X: " << formatFloat(mpu.getAngleX()) << ", Y: " << formatFloat(mpu.getAngleY()) << ", Z: " << formatFloat(mpu.getAngleZ()) << " ||| "
+    //   << "AccAngle (deg) => X: " << formatFloat(mpu.getAccAngleX()) << ", Y: " << formatFloat(mpu.getAccAngleY()) << " ||| ";
+    //   // << "Magnetic (uT) => X: " << formatFloat(event.magnetic.x) << "  " << "Y: " << formatFloat(event.magnetic.y) << "  " << "Z: " << formatFloat(event.magnetic.z) << " ||| ";
+
+
+    // float heading = atan2(event.magnetic.y, event.magnetic.x);
+
+    // // Once you have your heading, you must then add your 'Declination Angle', which is the 'Error' of the magnetic field in your location.
+    // // Find yours here: http://www.magnetic-declination.com/
+    // // Mine is: -13* 2' W, which is ~13 Degrees, or (which we need) 0.22 radians
+    // // If you cannot find your Declination, comment out these two lines, your compass will be slightly off.
+    // // float declinationAngle = 0.22;
+    // // heading += declinationAngle;
+
+    // // Correct for when signs are reversed.
+    // if (heading < 0)
+    //   heading += 2 * PI;
+
+    // // Check for wrap due to addition of declination.
+    // if (heading > 2 * PI)
+    //   heading -= 2 * PI;
+
+    // // Convert radians to degrees for readability.
+    // float headingDegrees = heading * 180 / M_PI;
+
+    // // payloadStream
+    // //   << "Heading (degrees): " << formatFloat(headingDegrees)
+    // //   << "Temperature (*C): " << formatFloat(bmp.readTemperature()) << " ||| "
+    // //   << "Pressure (Pa): " << formatFloat(bmp.readPressure()) << ", Altitude (meters): " << formatFloat(bmp.readAltitude());
+
+    // customPrint(payloadStream.str().c_str());
     delay(100);
   }
 }

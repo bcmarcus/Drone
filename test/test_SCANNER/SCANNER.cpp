@@ -7,7 +7,11 @@
 byte start_address = 0;
 byte end_address = 127;
 
-TwoWire wire = Wire;
+TwoWire wire = Wire1;
+
+#define MPU6050_I2C_ADDRESS 0x68
+#define MPU6050_REG_INT_PIN_CFG 0x37
+#define MPU6050_BIT_I2C_BYPASS_EN 0x02
 
 void setup()
 {
@@ -20,6 +24,8 @@ void setup()
   Serial.print("Scanning I2C bus from ");
   Serial.print(start_address,DEC);  Serial.print(" to ");  Serial.print(end_address,DEC);
   Serial.println("...");
+
+  setI2CBypass(true);
 
   for( byte addr  = start_address;
             addr <= end_address;
@@ -38,7 +44,6 @@ void setup()
   }
 
   Serial.println("\n-------------------------------\nPossible devices:");
-
   for( byte addr  = start_address;
             addr <= end_address;
             addr++ ) {
@@ -47,7 +52,7 @@ void setup()
       if (rc == 0) {
         Serial.print(addr,HEX); Serial.print(" = ");
         switch (addr) {
-          case 0x3D: Serial.println("HMC5883"); break;
+          case 0x1E: Serial.println("HMC5883L"); break;
           case 0x50: Serial.println("AT24C32/AT24C64 - EEPROM"); break;
           case 0x68: Serial.println("MPU6050"); break;
           case 0x77: Serial.println("BMP085"); break;

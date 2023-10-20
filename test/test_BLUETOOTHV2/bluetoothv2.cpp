@@ -33,8 +33,8 @@
 #include <SoftwareSerial.h>
 #include <Arduino.h>
 
-#define BLUETOOTH_TX 8
-#define BLUETOOTH_RX 7
+#define BLUETOOTH_RX 15
+#define BLUETOOTH_TX 14
 #define BAUDRATE 9600
 
 SoftwareSerial bluetooth(BLUETOOTH_RX, BLUETOOTH_TX);
@@ -49,9 +49,9 @@ void setup()
 
   //setup bluetooth
   bluetooth.begin(BAUDRATE);
-  bluetooth.flush();
   delay(1000);
-  bluetooth.write("AT+NAMELifeMCP");
+  // bluetooth.write("AT+NAMEDrone");
+  // bluetooth.write("AT+VERSION");
 }
 
 void loop()
@@ -71,9 +71,12 @@ void loop()
     Serial.println("BT Response");
     while (bluetooth.available())
     {
+      char c = (char)bluetooth.read();
       delay(3);
-      Serial.print((char)bluetooth.read());
+      Serial.print(c);
+      bluetooth.print(c);
     }
+    bluetooth.println();
     Serial.println();
   }
 }

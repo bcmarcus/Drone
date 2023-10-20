@@ -1,8 +1,10 @@
 import serial
 import time
 
+baudRate = 9600
+
 # Replace 'COM_PORT' with the appropriate COM port of your Bluetooth module on your PC
-ser = serial.Serial('/dev/tty.LifeMCP', 9600, timeout=1)
+ser = serial.Serial('/dev/tty.Drone', baudRate, timeout=1)
 
 try:
     while True:
